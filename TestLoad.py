@@ -1,48 +1,103 @@
 import pandas as pd
 import pickle
 import os
+import datetime
+import copy
+from random import shuffle
+import aaa
 
 
-anual = True
-if not os.path.exists('tradutores'):
-    os.mkdir('tradutores')
-if not os.path.exists('lojas_anual'):
-    os.mkdir('lojas_anual')
-for file in os.listdir('cupons'):
-    dict_traduto = {}
-    print(file)
-    df = pd.read_csv('cupons/' + file, sep=',', encoding='utf-8', usecols=['produtoid', 'data', 'vendaid','produto'])
-    loja = '_'.join(file.split('_')[1:3])
-    if not os.path.exists('lojas/' + loja):
-        os.mkdir('lojas/' + loja)
-    if not os.path.exists('lojas_anual/' + loja):
-        os.mkdir('lojas_anual/' + loja)
-    data = ''
-    ultimo_cupom = ''
-    dataset = []
-    cupom = []
-    for i, line in df.iterrows():
-        dict_traduto[line['produtoid']] = line['produto']
-        if line['vendaid'] != ultimo_cupom:
-            if ultimo_cupom != '':
-
-                dataset.append(cupom)
-                cupom = []
-            ultimo_cupom = line['vendaid']
-        if not anual:
-            if line['data'] != data:
-                if data != '':
-                    dataset.append(cupom)
-                    cupom = []
-                    pickle.dump(dataset, open('lojas/' + loja + '/' + str(data) + '.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
-                    dataset = []
-                data = line['data']
-        if line['produtoid'] not in cupom:
-            cupom.append(line['produtoid'])
-    dataset.append(cupom)
-
-    # pickle.dump(dict_traduto, open('tradutores/tradutor_loja_' + loja + '.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
-    if anual:
-        pickle.dump(dataset, open('lojas_anual/' + loja + '.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+def defmon(string):
+    if '-' in string:
+        x = int(string.split('-')[1])
+        if x % 2 > 0:
+            return str(x)
+        else:
+            return str(x-1)
     else:
-        pickle.dump(dataset, open('lojas/' + loja + '/' + str(data) + '.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+        if int(string) % 2 > 0:
+            return string
+        else:
+            return str(int(string) - 1)
+
+
+def start():
+    generate = True
+    component = True
+    cupons = False
+    if not os.path.exists('tradutores'):
+        os.mkdir('tradutores')
+    if not os.path.exists('lojas_mensal'):
+        os.mkdir('lojas_mensal')
+
+    component_dict_associations = {}
+    if generate:
+        for file in os.listdir('cupons'):
+            dict_traduto = {}
+            print(file)
+            df = pd.read_csv('cupons/' + file, sep=',', encoding='utf-8', usecols=['produtoid', 'produto', 'data', 'vendaid', 'produto', 'quantidade', 'valortotal', 'custo'])
+            df = df.sort_values(by = ['data', 'vendaid'])
+            # df['data'] = df['data'].apply(lambda a: str(int(a)-1) if int(a)%2>0 else a)
+            loja = '_'.join(file.split('_')[1:3])
+            ultimo_cupom = None
+
+            dataset = []
+            cupom = []
+            ultima_data = None
+            datasets_dia = {}
+
+            for i, line in df.iterrows():
+                if ultimo_cupom is None:
+                    ultimo_cupom = line['vendaid']
+                cupom_atual = line['vendaid']
+
+                if ultima_data is None:
+                    ultima_data = line['data']
+                data_atual = line['data']
+
+                faturamentototal = line['valortotal']
+                custo = line['custo']
+                if custo != custo:
+                    margemtotal = 0
+                else:
+                    margemtotal = line['valortotal'] - (custo*line['quantidade'])
+                quantidade = line['quantidade']
+
+                # dict_traduto[line['produtoid']] = line['produto']
+                if component:
+                    if loja not in component_dict_associations.keys():
+                        component_dict_associations[loja] = {}
+                    if data_atual not in component_dict_associations[loja].keys():
+                        component_dict_associations[loja][data_atual] = {}
+                    if line['produto'] not in component_dict_associations[loja][data_atual].keys():
+                        component_dict_associations[loja][data_atual][line['produto']] = {'qtd': 0, 'margem': 0, 'faturamento': 0}
+                    component_dict_associations[loja][data_atual][line['produto']]['qtd'] += quantidade
+                    if margemtotal == margemtotal:
+                        component_dict_associations[loja][data_atual][line['produto']]['margem'] += margemtotal
+                    component_dict_associations[loja][data_atual][line['produto']]['faturamento'] += faturamentototal
+                if cupons:
+                    if cupom_atual != ultimo_cupom:
+                        dataset.append(copy.deepcopy(cupom))
+                        cupom = []
+
+                    if data_atual != ultima_data:
+                        datasets_dia[ultima_data] = dataset
+                        dataset = []
+                    cupom.append(line['produtoid'])
+
+                ultimo_cupom = line['vendaid']
+                ultima_data = data_atual
+
+            dataset.append(cupom)
+            datasets_dia[ultima_data] = dataset
+            # pickle.dump(dict_traduto, open('tradutores/tradutor_loja_' + loja + '.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+            if cupons:
+                pickle.dump(datasets_dia, open('lojas_mensal/' + loja + '.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+        if component:
+            pickle.dump(component_dict_associations, open('component_dict.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+
+    files = os.listdir('lojas_mensal')
+    for file in files:
+        aaa.create_random('lojas_mensal/' + file)
+
+

@@ -23,8 +23,6 @@ def defmon(string):
 
 def start():
     generate = True
-    component = True
-    cupons = False
     if not os.path.exists('tradutores'):
         os.mkdir('tradutores')
     if not os.path.exists('lojas_mensal'):
@@ -52,49 +50,42 @@ def start():
                 cupom_atual = line['vendaid']
 
                 if ultima_data is None:
-                    ultima_data = line['data']
-                data_atual = line['data']
+                    ultima_data = defmon(line['data'])
+                data_atual = defmon(line['data'])
 
                 faturamentototal = line['valortotal']
-                custo = line['custo']
-                if custo != custo:
-                    margemtotal = 0
-                else:
-                    margemtotal = line['valortotal'] - (custo*line['quantidade'])
+                margemtotal = line['valortotal'] - (line['custo']*line['quantidade'])
                 quantidade = line['quantidade']
 
-                # dict_traduto[line['produtoid']] = line['produto']
-                if component:
-                    if loja not in component_dict_associations.keys():
-                        component_dict_associations[loja] = {}
-                    if data_atual not in component_dict_associations[loja].keys():
-                        component_dict_associations[loja][data_atual] = {}
-                    if line['produto'] not in component_dict_associations[loja][data_atual].keys():
-                        component_dict_associations[loja][data_atual][line['produto']] = {'qtd': 0, 'margem': 0, 'faturamento': 0}
-                    component_dict_associations[loja][data_atual][line['produto']]['qtd'] += quantidade
-                    if margemtotal == margemtotal:
-                        component_dict_associations[loja][data_atual][line['produto']]['margem'] += margemtotal
-                    component_dict_associations[loja][data_atual][line['produto']]['faturamento'] += faturamentototal
-                if cupons:
-                    if cupom_atual != ultimo_cupom:
-                        dataset.append(copy.deepcopy(cupom))
-                        cupom = []
+                dict_traduto[line['produtoid']] = line['produto']
 
-                    if data_atual != ultima_data:
-                        datasets_dia[ultima_data] = dataset
-                        dataset = []
-                    cupom.append(line['produtoid'])
+                if loja not in component_dict_associations.keys():
+                    component_dict_associations[loja] = {}
+                if data_atual not in component_dict_associations[loja].keys():
+                    component_dict_associations[loja][data_atual] = {}
+                if line['produto'] not in component_dict_associations[loja][data_atual].keys():
+                    component_dict_associations[loja][data_atual][line['produto']] = {'qtd': 0, 'margem': 0, 'faturamento': 0}
+                component_dict_associations[loja][data_atual][line['produto']]['qtd'] += quantidade
+                component_dict_associations[loja][data_atual][line['produto']]['margem'] += margemtotal
+                component_dict_associations[loja][data_atual][line['produto']]['faturamento'] += faturamentototal
 
+                if cupom_atual != ultimo_cupom:
+                    dataset.append(copy.deepcopy(cupom))
+                    cupom = []
+
+                if data_atual != ultima_data:
+                    datasets_dia[ultima_data] = dataset
+                    dataset = []
+
+                cupom.append(line['produtoid'])
                 ultimo_cupom = line['vendaid']
                 ultima_data = data_atual
 
             dataset.append(cupom)
             datasets_dia[ultima_data] = dataset
-            # pickle.dump(dict_traduto, open('tradutores/tradutor_loja_' + loja + '.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
-            if cupons:
-                pickle.dump(datasets_dia, open('lojas_mensal/' + loja + '.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
-        if component:
-            pickle.dump(component_dict_associations, open('component_dict.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(dict_traduto, open('tradutores/tradutor_loja_' + loja + '.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(datasets_dia, open('lojas_mensal/' + loja + '.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump(component_dict_associations, open('component_dict.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
 
     files = os.listdir('lojas_mensal')
     for file in files:

@@ -28,8 +28,8 @@ pd.set_option('display.max_columns', 999)
 pd.set_option('display.width', 999)
 
 
-support_threshold = 0.009
-multiplicador_em_falha = 2
+support_threshold = 0.01
+multiplicador_em_falha = 1
 rand_support_threshold = 0.01
 confidence_threshold = 0.01
 
@@ -38,13 +38,11 @@ generate_dataset = False
 generate_natural = True
 generate_random = True
 incremet_random = True
-split_date = False
-generate_compoent_csv = True
+split_date = True
 
 if generate_dataset:
     TestLoad.start()
 if generate_natural:
-    print('generating natural')
     for lojax in os.listdir('lojas_mensal'):
         loja = lojax.split('.')[0]
         print(loja)
@@ -77,7 +75,7 @@ if generate_natural:
             df["consequent_fat"] = df["consequents"].apply(lambda a: component_dict[loja][mes][a]['faturamento']/component_dict[loja][mes][a]['qtd'])
             df["margem"] = (df["antecedent_margem"] + df["consequent_margem"]) * df["support"] * transaction_len
             df["faturamento"] = (df["antecedent_fat"] + df["consequent_fat"]) * df["support"] * transaction_len
-            df['data'] = mes
+            df['data'] = mes.split('.')[0]
             df['loja'] = loja
             df['qtd_cupons'] = transaction_len
 
@@ -89,7 +87,6 @@ if generate_natural:
         totalDf.to_csv('output/SaidaApriori_' + loja + '_CMMensal.csv', sep=';', index=False)
 
 if generate_random:
-    print('generating random')
     for lojax in os.listdir('random'):
         loja = lojax.split('.')[0]
         print(loja)
@@ -99,7 +96,6 @@ if generate_random:
         totalDf = pd.DataFrame()
         compare_dict = {}
         for mes in loja_dict.keys():
-            print(mes)
             dataset = loja_dict[mes]
             te = TransactionEncoder()
             transaction_len = len(dataset)
@@ -131,11 +127,9 @@ if generate_random:
 
         aaa.savepickle(compare_dict, 'random_dicts/' + loja + '.pickle')
 if incremet_random:
-    print('increment random')
     totalDf = pd.DataFrame()
     for file in os.listdir('output'):
         loja = file.split('SaidaApriori_')[1].split('_CMMensal.csv')[0]
-        print(loja)
         compare_dict = aaa.read_pickle('random_dicts/' + loja + '.pickle')
         df = pd.read_csv('output/' + file, sep=';')
 
@@ -150,7 +144,7 @@ if incremet_random:
             list_of_confidence.append(0.0)
         df['confidenceRand'] = list_of_confidence
         df['conf{real - random}'] = df['confidence'] - df['confidenceRand']
-        df['association'] = df['antecedents'] + ' -> ' + df['consequents']
+        df['associations'] = df['antecedents'] + ' -> ' + df['consequents']
         df = df.drop(columns = ["confidenceRand"])
         if len(totalDf) == 0:
             totalDf = df
@@ -161,15 +155,15 @@ if incremet_random:
 
 if split_date:
     saida = pd.read_csv('saidaall.csv', sep = ';')
-    if 'association' not in saida.columns:
-        saida['association'] = saida['antecedents'] + ' -> ' + saida['consequents']
+    if 'associations' not in saida.columns:
+        saida['associations'] = saida['antecedents'] + ' -> ' + saida['consequents']
     for loja in saida['loja'].unique():
         tempdf = saida[saida['loja'] == loja]
 
-        associations = tempdf['association'].unique()
+        associations = tempdf['associations'].unique()
         meses = tempdf['data'].unique()
         newindex =list(itertools.product(associations, meses))
-        tempdf.set_index(['association', 'data'], inplace = True)
+        tempdf.set_index(['associations', 'data'], inplace = True)
         tempdf = tempdf[~tempdf.index.duplicated()]
         tempdf = tempdf.reindex(newindex)
         tempdf.reset_index(inplace = True)
@@ -177,28 +171,3 @@ if split_date:
 
         tempdf.to_csv('saidaall_' + str(loja) + '.csv', sep=';',index = False)
 
-if generate_compoent_csv:
-    component_dict = aaa.read_pickle('component_dict.pickle')
-    lojalist = []
-    datalist = []
-    itemlist = []
-    qtdlist = []
-    fatlist = []
-    marlist = []
-    for loja in component_dict.keys():
-        for data in component_dict[loja].keys():
-            for produto in component_dict[loja][data].keys():
-                qtdlist.append(component_dict[loja][data][produto]['qtd'])
-                marlist.append(component_dict[loja][data][produto]['margem'])
-                fatlist.append(component_dict[loja][data][produto]['faturamento'])
-                lojalist.append(loja)
-                itemlist.append(produto)
-                datalist.append(data)
-    df = pd.DataFrame()
-    df['loja'] = lojalist
-    df['faturamento'] = fatlist
-    df['data'] = datalist
-    df['margem'] = marlist
-    df['produto'] = itemlist
-    df['qtd'] = qtdlist
-    df.to_csv('component_all.csv',sep=';',index = False,encoding = 'utf-8')

@@ -4,40 +4,33 @@ import os
 import datetime
 import copy
 from random import shuffle
-import aaa
+import randomCreator
 
 
 def defmon(string):
-    if '-' in string:
-        x = int(string.split('-')[1])
-        if x % 2 > 0:
-            return str(x)
-        else:
-            return str(x-1)
+    x = int(string.split('-')[1])
+    if x % 2 > 0:
+        return str(x)
     else:
-        if int(string) % 2 > 0:
-            return string
-        else:
-            return str(int(string) - 1)
+        return str(x-1)
 
 
-def start():
-    generate = True
-    component = True
-    cupons = False
+def start(cupons = True, random = True,component = True):
     if not os.path.exists('tradutores'):
         os.mkdir('tradutores')
     if not os.path.exists('lojas_mensal'):
         os.mkdir('lojas_mensal')
+    if not os.path.exists('random'):
+        os.mkdir('random')
 
     component_dict_associations = {}
-    if generate:
+    if component or cupons:
         for file in os.listdir('cupons'):
             dict_traduto = {}
             print(file)
             df = pd.read_csv('cupons/' + file, sep=',', encoding='utf-8', usecols=['produtoid', 'produto', 'data', 'vendaid', 'produto', 'quantidade', 'valortotal', 'custo'])
             df = df.sort_values(by = ['data', 'vendaid'])
-            # df['data'] = df['data'].apply(lambda a: str(int(a)-1) if int(a)%2>0 else a)
+            df['mes'] = df['data'].apply(lambda a: defmon(a))
             loja = '_'.join(file.split('_')[1:3])
             ultimo_cupom = None
 
@@ -52,8 +45,8 @@ def start():
                 cupom_atual = line['vendaid']
 
                 if ultima_data is None:
-                    ultima_data = line['data']
-                data_atual = line['data']
+                    ultima_data = line['mes']
+                data_atual = line['mes']
 
                 faturamentototal = line['valortotal']
                 custo = line['custo']
@@ -63,7 +56,7 @@ def start():
                     margemtotal = line['valortotal'] - (custo*line['quantidade'])
                 quantidade = line['quantidade']
 
-                # dict_traduto[line['produtoid']] = line['produto']
+                dict_traduto[line['produtoid']] = line['produto']
                 if component:
                     if loja not in component_dict_associations.keys():
                         component_dict_associations[loja] = {}
@@ -90,14 +83,14 @@ def start():
 
             dataset.append(cupom)
             datasets_dia[ultima_data] = dataset
-            # pickle.dump(dict_traduto, open('tradutores/tradutor_loja_' + loja + '.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(dict_traduto, open('tradutores/tradutor_loja_' + loja + '.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
             if cupons:
                 pickle.dump(datasets_dia, open('lojas_mensal/' + loja + '.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
         if component:
             pickle.dump(component_dict_associations, open('component_dict.pickle', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
-
-    files = os.listdir('lojas_mensal')
-    for file in files:
-        aaa.create_random('lojas_mensal/' + file)
+    if random:
+        files = os.listdir('lojas_mensal')
+        for file in files:
+            randomCreator.create_random('lojas_mensal/' + file)
 
 

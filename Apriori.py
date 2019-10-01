@@ -1,13 +1,15 @@
 from mlxtend.preprocessing import TransactionEncoder
 from mlxtend.frequent_patterns import apriori
+from mlxtend.frequent_patterns import fpmax
+from mlxtend.frequent_patterns import fpgrowth
 from mlxtend.frequent_patterns import association_rules
+from collections import defaultdict
 import pandas as pd
-import TestLoad
+import DatasetBuilder
 import itertools
 import pickle
 import os
-import aaa
-import numpy as np
+import randomCreator
 
 
 def unfreeze(thing):
@@ -28,29 +30,32 @@ pd.set_option('display.max_columns', 999)
 pd.set_option('display.width', 999)
 
 
-support_threshold = 0.009
+support_threshold = 0.0007
 multiplicador_em_falha = 2
-rand_support_threshold = 0.01
+rand_support_threshold = 0.0007
 confidence_threshold = 0.01
 
-
-generate_dataset = False
-generate_natural = True
-generate_random = True
+generate_natural = False
+generate_random = False
+generate_components = False
+apriori_natural = True
+apriori_random = True
 incremet_random = True
 split_date = False
-generate_compoent_csv = True
+generate_component_csv = False
 
-if generate_dataset:
-    TestLoad.start()
-if generate_natural:
+DatasetBuilder.start(generate_natural, generate_random, generate_components)
+
+if apriori_natural:
     print('generating natural')
+    if not os.path.exists('output'):
+        os.mkdir('output')
     for lojax in os.listdir('lojas_mensal'):
         loja = lojax.split('.')[0]
         print(loja)
 
-        tradutor = aaa.read_pickle('tradutores/tradutor_loja_' + loja + '.pickle')
-        component_dict = aaa.read_pickle('component_dict.pickle')
+        tradutor = randomCreator.read_pickle('tradutores/tradutor_loja_' + loja + '.pickle')
+        component_dict = randomCreator.read_pickle('component_dict.pickle')
         loja_dict = pickle.load(open('lojas_mensal/' + loja + '.pickle', 'rb'))
         totalDf = pd.DataFrame()
         for mes in loja_dict.keys():
@@ -58,13 +63,37 @@ if generate_natural:
             dataset = loja_dict[mes]
             te = TransactionEncoder()
             transaction_len = len(dataset)
+            #  ___________________________________________________________________________________
+            # debugs
+            qtd_dict = defaultdict(int)
+            for transaction in dataset:
+                for iten in transaction:
+                    qtd_dict[iten] += 1
+            needed = support_threshold*transaction_len
+            a = list(qtd_dict.keys())
+            for key in a:
+                if qtd_dict[key] < needed:
+                    del qtd_dict[key]
+            valids = list(qtd_dict.keys())
+            new_dataset = []
+            for transaction in dataset:
+                new_transaction = []
+                for item in transaction:
+                    if item in valids:
+                        new_transaction.append(item)
+                if len(new_transaction) > 0:
+                    new_dataset.append(new_transaction)
+            dataset = new_dataset
+            #  ___________________________________________________________________________________
+
             te_ary = te.fit(dataset).transform(dataset)
             df = pd.DataFrame(te_ary, columns=te.columns_)
-            try:
-                frequent_item_set = apriori(df, min_support = support_threshold, use_colnames = True, max_len = 2)
-            except MemoryError:
-                print('valor de ' + str(support_threshold) + ' nao funcionou incrementando para ' + str(support_threshold*multiplicador_em_falha) + ' no mes: ' + mes)
-                frequent_item_set = apriori(df, min_support = support_threshold*multiplicador_em_falha, use_colnames = True, max_len = 2)
+            frequent_item_set = fpgrowth(df, min_support=support_threshold, use_colnames=True, max_len=2)
+            # try:
+            #     frequent_item_set = apriori(df, min_support = support_threshold, use_colnames = True,max_len=2)
+            # except MemoryError:
+            #     print('valor de ' + str(support_threshold) + ' nao funcionou incrementando para ' + str(support_threshold*multiplicador_em_falha) + ' no mes: ' + mes)
+            #     frequent_item_set = apriori(df, min_support = support_threshold*multiplicador_em_falha, use_colnames = True, max_len = 2)
             df = pd.DataFrame(frequent_item_set)
             df = association_rules(df, metric="confidence", min_threshold = confidence_threshold)
             df['Nconfidence'] = df['support'] / df['consequent support']
@@ -88,12 +117,14 @@ if generate_natural:
 
         totalDf.to_csv('output/SaidaApriori_' + loja + '_CMMensal.csv', sep=';', index=False)
 
-if generate_random:
+if apriori_random:
     print('generating random')
+    if not os.path.exists('random_dicts'):
+        os.mkdir('random_dicts')
     for lojax in os.listdir('random'):
         loja = lojax.split('.')[0]
         print(loja)
-        tradutor = aaa.read_pickle('tradutores/tradutor_loja_' + loja + '.pickle')
+        tradutor = randomCreator.read_pickle('tradutores/tradutor_loja_' + loja + '.pickle')
 
         loja_dict = pickle.load(open('random/' + loja + '.pickle', 'rb'))
         totalDf = pd.DataFrame()
@@ -101,15 +132,38 @@ if generate_random:
         for mes in loja_dict.keys():
             print(mes)
             dataset = loja_dict[mes]
-            te = TransactionEncoder()
             transaction_len = len(dataset)
+            #  ___________________________________________________________________________________
+            # debugs
+            qtd_dict = defaultdict(int)
+            for transaction in dataset:
+                for iten in transaction:
+                    qtd_dict[iten] += 1
+            needed = support_threshold * transaction_len
+            a = list(qtd_dict.keys())
+            for key in a:
+                if qtd_dict[key] < needed:
+                    del qtd_dict[key]
+            valids = list(qtd_dict.keys())
+            new_dataset = []
+            for transaction in dataset:
+                new_transaction = []
+                for item in transaction:
+                    if item in valids:
+                        new_transaction.append(item)
+                if len(new_transaction) > 0:
+                    new_dataset.append(new_transaction)
+            dataset = new_dataset
+            #  ___________________________________________________________________________________
+            te = TransactionEncoder()
             te_ary = te.fit(dataset).transform(dataset)
             randf = pd.DataFrame(te_ary, columns=te.columns_)
-            try:
-                frequent_item_set = apriori(randf, min_support = rand_support_threshold, use_colnames = True, max_len = 2)
-            except MemoryError:
-                print('valor de ' + str(rand_support_threshold) + ' nao funcionou incrementando para '+str(rand_support_threshold*multiplicador_em_falha)+' no mes: ' + mes)
-                frequent_item_set = apriori(randf, min_support = rand_support_threshold*multiplicador_em_falha, use_colnames = True, max_len = 2)
+            frequent_item_set = fpgrowth(randf, min_support=support_threshold, use_colnames=True, max_len=2)
+            # try:
+            #     frequent_item_set = apriori(randf, min_support = rand_support_threshold, use_colnames = True, max_len = 2)
+            # except MemoryError:
+            #     print('valor de ' + str(rand_support_threshold) + ' nao funcionou incrementando para '+str(rand_support_threshold*multiplicador_em_falha)+' no mes: ' + mes)
+            #     frequent_item_set = apriori(randf, min_support = rand_support_threshold*multiplicador_em_falha, use_colnames = True, max_len = 2)
             randf = pd.DataFrame(frequent_item_set)
             randf = association_rules(randf, metric="confidence", min_threshold =confidence_threshold)
             randf['Nconfidence'] = randf['support'] / randf['consequent support']
@@ -129,14 +183,15 @@ if generate_random:
                 if antecedent not in compare_dict[consequent].keys():
                     compare_dict[consequent][antecedent] = nconfidence
 
-        aaa.savepickle(compare_dict, 'random_dicts/' + loja + '.pickle')
+        randomCreator.savepickle(compare_dict, 'random_dicts/' + loja + '.pickle')
+
 if incremet_random:
     print('increment random')
     totalDf = pd.DataFrame()
     for file in os.listdir('output'):
         loja = file.split('SaidaApriori_')[1].split('_CMMensal.csv')[0]
         print(loja)
-        compare_dict = aaa.read_pickle('random_dicts/' + loja + '.pickle')
+        compare_dict = randomCreator.read_pickle('random_dicts/' + loja + '.pickle')
         df = pd.read_csv('output/' + file, sep=';')
 
         list_of_confidence = []
@@ -177,8 +232,8 @@ if split_date:
 
         tempdf.to_csv('saidaall_' + str(loja) + '.csv', sep=';',index = False)
 
-if generate_compoent_csv:
-    component_dict = aaa.read_pickle('component_dict.pickle')
+if generate_component_csv:
+    component_dict = randomCreator.read_pickle('component_dict.pickle')
     lojalist = []
     datalist = []
     itemlist = []

@@ -1,1 +1,5 @@
 *.pickle
+.idea
+*.csv
+cupons
+output
